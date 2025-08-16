@@ -152,13 +152,29 @@ void SetContrast(float contrast)
     }
 }
 
+void SetInputSource(const char* input_name, BYTE input_value, BYTE command_code, BYTE register_address)
+{
+    if (!g_app_state.nvapi_initialized) return;
+
+    BOOL result = WriteValueToMonitor(g_app_state.current_gpu, g_app_state.current_output_id, 
+                                    input_value, command_code, register_address);
+    
+    if (result) {
+        snprintf(g_app_state.status_message, sizeof(g_app_state.status_message),
+                "Input switched to %s", input_name);
+    } else {
+        snprintf(g_app_state.status_message, sizeof(g_app_state.status_message),
+                "Failed to switch to %s", input_name);
+    }
+}
+
 // Main code
 int main(int, char**)
 {
-    // Create application window
+    // Create application window - sized for monitor control interface
     WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"Monitor Control", nullptr };
     ::RegisterClassExW(&wc);
-    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Monitor Control - NVidia API", WS_OVERLAPPEDWINDOW, 100, 100, 800, 600, nullptr, nullptr, wc.hInstance, nullptr);
+    HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Monitor Control - NVidia API", WS_OVERLAPPEDWINDOW, 100, 100, 450, 360, nullptr, nullptr, wc.hInstance, nullptr);
 
     // Initialize Direct3D
     if (!CreateDeviceD3D(hwnd))
@@ -181,6 +197,15 @@ int main(int, char**)
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
+    
+    // Customize style for more compact interface
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowRounding = 6.0f;
+    style.FrameRounding = 4.0f;
+    style.WindowPadding = ImVec2(10, 8);
+    style.FramePadding = ImVec2(8, 4);
+    style.ItemSpacing = ImVec2(8, 6);
+    style.WindowTitleAlign = ImVec2(0.5f, 0.5f);  // Center the title
 
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(hwnd);
@@ -222,8 +247,16 @@ int main(int, char**)
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
 
-        // Main window
-        ImGui::Begin("Monitor Control");
+        // Main window - fill the entire available space
+        ImGuiIO& io = ImGui::GetIO();
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(io.DisplaySize, ImGuiCond_Always);
+        ImGui::Begin("Monitor Control", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
+
+        // Add title and some spacing
+        ImGui::Text("Monitor Control");
+        ImGui::Separator();
+        ImGui::Spacing();
 
         // Display selection
         if (g_app_state.nvapi_initialized && g_app_state.display_count > 1) {
@@ -263,16 +296,16 @@ int main(int, char**)
             // Quick presets
             ImGui::Text("Quick Presets:");
             if (ImGui::Button("Bright")) {
-                SetBrightness(80.0f);
+                SetBrightness(100.0f);
                 SetContrast(75.0f);
-                brightness_temp = 80.0f;
+                brightness_temp = 100.0f;
                 contrast_temp = 75.0f;
             }
             ImGui::SameLine();
             if (ImGui::Button("Normal")) {
-                SetBrightness(50.0f);
+                SetBrightness(75.0f);
                 SetContrast(50.0f);
-                brightness_temp = 50.0f;
+                brightness_temp = 75.0f;
                 contrast_temp = 50.0f;
             }
             ImGui::SameLine();
@@ -281,6 +314,26 @@ int main(int, char**)
                 SetContrast(40.0f);
                 brightness_temp = 20.0f;
                 contrast_temp = 40.0f;
+            }
+
+            ImGui::Separator();
+
+            // Input source selection (LG Ultragear specific)
+            ImGui::Text("Input Source (LG Ultragear):");
+            if (ImGui::Button("HDMI 1")) {
+                SetInputSource("HDMI 1", 0x90, 0xF4, 0x50);  // LG specific: HDMI 1
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("HDMI 2")) {
+                SetInputSource("HDMI 2", 0x91, 0xF4, 0x50);  // LG specific: HDMI 2 (estimated)
+            }
+            
+            if (ImGui::Button("DisplayPort")) {
+                SetInputSource("DisplayPort", 0xD0, 0xF4, 0x50);  // LG specific: DisplayPort
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("USB-C")) {
+                SetInputSource("USB-C", 0xD1, 0xF4, 0x50);  // LG specific: USB-C (estimated)
             }
         } else {
             ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.5f, 1.0f), "NVidia API not initialized!");
