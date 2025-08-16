@@ -1,11 +1,14 @@
-#pragma comment(lib, "nvapi64.lib")
+#ifdef _WIN64
+#pragma comment(lib, "external/nvapi/amd64/nvapi64.lib")
+#else
+#pragma comment(lib, "external/nvapi/x86/nvapi.lib")
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
 #include <tchar.h>
-#include "nvapi.h"
-#include "targetver.h"
+#include "external/nvapi/nvapi.h"
 
 
 BOOL WriteValueToMonitor(NvPhysicalGpuHandle hPhysicalGpu, NvU32 displayId, BYTE input_value, BYTE command_code, BYTE register_address);

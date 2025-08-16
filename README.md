@@ -1,9 +1,40 @@
-# NVapi-write-value-to-monitor
-Send commands to monitor over i2c using NVapi. <br>
-This can be used to issue VCP commands or other manufacturer specific commands
+# Monitor Control via NVidia API
 
+Send commands to monitor over I2C using NVapi. This can be used to issue VCP commands or other manufacturer specific commands.
 
-This program relies on the NVIDIA API (NVAPI), to compile it you will need to download the api which can be found here: <br> https://developer.nvidia.com/rtx/path-tracing/nvapi/get-started
+## Quick Start
+
+**The NVidia API is now included as a git submodule - no separate download needed!**
+
+1. **Clone with submodules:**
+   ```bash
+   git clone --recursive <your-repo-url>
+   # Or if already cloned:
+   git submodule update --init --recursive
+   ```
+
+2. **Build:**
+   ```bash
+   mkdir build && cd build
+   cmake .. -A x64
+   cmake --build . --config Release
+   ```
+
+3. **Run:**
+   ```bash
+   ./bin/Release/writeValueToDisplay.exe 0 0x32 0x10  # Set brightness to 50%
+   ```
+
+## Build System
+
+This project now uses **CMake** for cross-platform builds and better dependency management:
+- ✅ Automatic architecture detection (x64/x86)
+- ✅ Integrated NVidia API linking  
+- ✅ Organized project structure
+- ✅ Ready for GUI development
+
+📖 **Detailed build instructions:** [docs/BUILD.md](docs/BUILD.md)
+🖥️ **GUI development guide:** [docs/GUI_OPTIONS.md](docs/GUI_OPTIONS.md)
 
 ### History 
 This program was created after discovering that my display does not work with <b>ControlMyMonitor</b> to change inputs using VCP commands. Searching for an antlernative lead me to this thread https://github.com/rockowitz/ddcutil/issues/100 where other users had found a way to switch the inputs of their LG monitors using a linux program, I needed a windows solution. That lead to the NVIDIA API, this program is an adaptation of the i2c example code provided in the API
