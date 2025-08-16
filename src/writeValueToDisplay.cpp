@@ -1,14 +1,10 @@
-#ifdef _WIN64
-#pragma comment(lib, "external/nvapi/amd64/nvapi64.lib")
-#else
-#pragma comment(lib, "external/nvapi/x86/nvapi.lib")
-#endif
+// Library linking is now handled by CMake - see CMakeLists.txt
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
 #include <tchar.h>
-#include "external/nvapi/nvapi.h"
+#include "nvapi.h"
 
 
 BOOL WriteValueToMonitor(NvPhysicalGpuHandle hPhysicalGpu, NvU32 displayId, BYTE input_value, BYTE command_code, BYTE register_address);
@@ -174,7 +170,7 @@ BOOL WriteValueToMonitor(NvPhysicalGpuHandle hPhysicalGpu, NvU32 displayId,BYTE 
     //
     NvU8 i2cDeviceAddr = 0x37;
     NvU8 i2cWriteDeviceAddr = i2cDeviceAddr << 1; //0x6E
-    NvU8 i2cReadDeviceAddr = i2cWriteDeviceAddr | 1; //0x6F
+    NvU8 i2cReadDeviceAddr = i2cWriteDeviceAddr | 1; //0x6F (unused but kept for documentation)
 
 
     //
