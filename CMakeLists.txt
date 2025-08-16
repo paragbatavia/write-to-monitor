@@ -37,18 +37,50 @@ include_directories(
     ${CMAKE_SOURCE_DIR}/external/nvapi
 )
 
-# Create the main executable
-add_executable(writeValueToDisplay
-    src/writeValueToDisplay.cpp
+# ImGui source files
+set(IMGUI_SOURCES
+    external/imgui/imgui.cpp
+    external/imgui/imgui_demo.cpp
+    external/imgui/imgui_draw.cpp
+    external/imgui/imgui_tables.cpp
+    external/imgui/imgui_widgets.cpp
+    external/imgui/backends/imgui_impl_win32.cpp
+    external/imgui/backends/imgui_impl_dx11.cpp
 )
 
-# Link libraries
+# Create the console executable
+add_executable(writeValueToDisplay
+    src/writeValueToDisplay.cpp
+    src/monitor_control.cpp
+)
+
+# Create the GUI executable
+add_executable(monitor_control_gui
+    src/monitor_control_gui.cpp
+    src/monitor_control.cpp
+    ${IMGUI_SOURCES}
+)
+
+# Link libraries for console app
 target_link_libraries(writeValueToDisplay
     ${NVAPI_LIB_PATH}
 )
 
+# Link libraries for GUI app
+target_link_libraries(monitor_control_gui
+    ${NVAPI_LIB_PATH}
+    d3d11
+    dxgi
+)
+
+# Set additional include directories for ImGui
+target_include_directories(monitor_control_gui PRIVATE
+    external/imgui
+    external/imgui/backends
+)
+
 # Set output directory
-set_target_properties(writeValueToDisplay PROPERTIES
+set_target_properties(writeValueToDisplay monitor_control_gui PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
