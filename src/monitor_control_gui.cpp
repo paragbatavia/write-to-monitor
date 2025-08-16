@@ -120,7 +120,7 @@ void SetBrightness(float brightness)
 {
     if (!g_app_state.nvapi_initialized) return;
 
-    BYTE value = (BYTE)(brightness * 255.0f / 100.0f);
+    BYTE value = (BYTE)(brightness * 100.0f / 100.0f); // scale to 0-100
     BOOL result = WriteValueToMonitor(g_app_state.current_gpu, g_app_state.current_output_id, 
                                     value, 0x10, 0x51); // 0x10 = brightness VCP code
     
@@ -138,7 +138,7 @@ void SetContrast(float contrast)
 {
     if (!g_app_state.nvapi_initialized) return;
 
-    BYTE value = (BYTE)(contrast * 255.0f / 100.0f);
+    BYTE value = (BYTE)(contrast * 100.0f / 100.0f);
     BOOL result = WriteValueToMonitor(g_app_state.current_gpu, g_app_state.current_output_id, 
                                     value, 0x12, 0x51); // 0x12 = contrast VCP code
     
