@@ -54,8 +54,8 @@ add_executable(writeValueToDisplay
     src/monitor_control.cpp
 )
 
-# Create the GUI executable
-add_executable(monitor_control_gui
+# Create the GUI executable (Windows application - no console)
+add_executable(monitor_control_gui WIN32
     src/monitor_control_gui.cpp
     src/monitor_control.cpp
     ${IMGUI_SOURCES}

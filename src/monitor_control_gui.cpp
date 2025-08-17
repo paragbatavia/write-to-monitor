@@ -168,8 +168,8 @@ void SetInputSource(const char* input_name, BYTE input_value, BYTE command_code,
     }
 }
 
-// Main code
-int main(int, char**)
+// Main code - Windows application entry point (no console window)
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
     // Create application window - sized for monitor control interface
     WNDCLASSEXW wc = { sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"Monitor Control", nullptr };

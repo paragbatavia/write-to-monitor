@@ -132,7 +132,7 @@
       <LinkErrorReporting></LinkErrorReporting>
       <ProgramDataBaseFile>C:/Users/parag/source/write-to-monitor/build/bin/Debug/monitor_control_gui.pdb</ProgramDataBaseFile>
       <RandomizedBaseAddress></RandomizedBaseAddress>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
@@ -187,7 +187,7 @@
       <LinkErrorReporting></LinkErrorReporting>
       <ProgramDataBaseFile>C:/Users/parag/source/write-to-monitor/build/bin/Release/monitor_control_gui.pdb</ProgramDataBaseFile>
       <RandomizedBaseAddress></RandomizedBaseAddress>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
@@ -242,7 +242,7 @@
       <LinkErrorReporting></LinkErrorReporting>
       <ProgramDataBaseFile>C:/Users/parag/source/write-to-monitor/build/bin/MinSizeRel/monitor_control_gui.pdb</ProgramDataBaseFile>
       <RandomizedBaseAddress></RandomizedBaseAddress>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
@@ -296,7 +296,7 @@
       <LinkErrorReporting></LinkErrorReporting>
       <ProgramDataBaseFile>C:/Users/parag/source/write-to-monitor/build/bin/RelWithDebInfo/monitor_control_gui.pdb</ProgramDataBaseFile>
       <RandomizedBaseAddress></RandomizedBaseAddress>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
