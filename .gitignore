@@ -1,0 +1,159 @@
+# CMake build directories
+build/
+build-*/
+out/
+cmake-build-*/
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Visual Studio / MSBuild
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+x64/
+x86/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+
+# Visual Studio Code
+.vscode/
+.history/
+
+# Compiled executables
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Object files
+*.o
+*.obj
+*.lo
+*.slo
+*.ko
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.la
+*.lo
+*.a
+*.lib
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Qt-MOC
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.moc
+
+# Install directories
+install/
+prefix/
+
+# Package files
+*.deb
+*.rpm
+*.msi
+*.msix
+*.appx
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*~
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# CPack generated files
+_CPack_Packages/
+*.tar.gz
+*.zip
+
+# IDE specific files
+*.cbp
+*.layout
+*.workspace
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Profiling and debugging
+*.gcda
+*.gcno
+*.gcov
+callgrind.out.*
+*.dSYM/
+
+# Coverage reports
+coverage/
+*.coverage
+*.coveragexml
+lcov.info
+
+# Memory debugging
+*.suppressions
+vgcore.*
+
+# Sanitizer outputs
+*.san
+
+# Documentation generated files
+docs/_build/
+doc/html/
+doc/latex/
+
+# Custom build artifacts (you can add project-specific items here)
+*.pdb
+*.ilk
+*.exp
+*.map
+
+# Conan package manager
+conaninfo.txt
+conanbuildinfo.*
+conan.lock
+
+# vcpkg
+vcpkg_installed/
+
+# FetchContent
+_deps/
+
+# Testing
+Testing/
+CTestTestfile.cmake
+
+# Ninja build files
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
