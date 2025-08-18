@@ -111,8 +111,14 @@ bool SelectGUIDisplay(int display_index)
     }
 
     g_app_state.selected_display = display_index;
+    
+    // Set default values instead of reading from monitor
+    g_app_state.brightness = 50.0f;
+    g_app_state.contrast = 50.0f;
+    
     snprintf(g_app_state.status_message, sizeof(g_app_state.status_message),
-            "Selected display %d", display_index);
+            "Display %d selected successfully", display_index);
+    
     return true;
 }
 
@@ -120,7 +126,7 @@ void SetBrightness(float brightness)
 {
     if (!g_app_state.nvapi_initialized) return;
 
-    BYTE value = (BYTE)(brightness * 100.0f / 100.0f); // scale to 0-100
+    BYTE value = (BYTE)brightness; // LG monitor uses 0-100 range directly
     BOOL result = WriteValueToMonitor(g_app_state.current_gpu, g_app_state.current_output_id, 
                                     value, 0x10, 0x51); // 0x10 = brightness VCP code
     
@@ -138,7 +144,7 @@ void SetContrast(float contrast)
 {
     if (!g_app_state.nvapi_initialized) return;
 
-    BYTE value = (BYTE)(contrast * 100.0f / 100.0f);
+    BYTE value = (BYTE)contrast; // LG monitor uses 0-100 range directly
     BOOL result = WriteValueToMonitor(g_app_state.current_gpu, g_app_state.current_output_id, 
                                     value, 0x12, 0x51); // 0x12 = contrast VCP code
     
@@ -195,10 +201,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
+    // Setup Dear ImGui style - Light theme with Windows system font
+    ImGui::StyleColorsLight();
     
-    // Customize style for more compact interface
+    // Load Windows system font (Segoe UI)
+    ImGuiIO& io_font = ImGui::GetIO();
+    io_font.Fonts->AddFontFromFileTTF("C:/Windows/Fonts/segoeui.ttf", 16.0f);
+    
+    // Customize style for more compact interface with lighter colors
     ImGuiStyle& style = ImGui::GetStyle();
     style.WindowRounding = 6.0f;
     style.FrameRounding = 4.0f;
@@ -206,6 +216,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     style.FramePadding = ImVec2(8, 4);
     style.ItemSpacing = ImVec2(8, 6);
     style.WindowTitleAlign = ImVec2(0.5f, 0.5f);  // Center the title
+    
+    // Light color palette adjustments
+    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.95f, 0.95f, 0.95f, 1.00f);         // Light gray background
+    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);          // Lighter control backgrounds
+    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.85f, 0.85f, 0.85f, 1.00f);   // Hover state
+    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.80f, 0.80f, 0.80f, 1.00f);    // Active state
+    style.Colors[ImGuiCol_Button] = ImVec4(0.88f, 0.88f, 0.88f, 1.00f);           // Button color
+    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.78f, 0.78f, 0.78f, 1.00f);    // Button hover
+    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.68f, 0.68f, 0.68f, 1.00f);     // Button pressed
+    style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);       // Windows blue for sliders
+    style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.20f, 0.47f, 0.80f, 1.00f); // Darker blue when dragging
 
     // Setup Platform/Renderer backends
     ImGui_ImplWin32_Init(hwnd);
@@ -277,18 +298,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (g_app_state.nvapi_initialized) {
             // Brightness control
             ImGui::Text("Brightness:");
-            static float brightness_temp = g_app_state.brightness;
-            if (ImGui::SliderFloat("##brightness", &brightness_temp, 0.0f, 100.0f, "%.0f%%")) {
-                SetBrightness(brightness_temp);
+            if (ImGui::SliderFloat("##brightness", &g_app_state.brightness, 0.0f, 100.0f, "%.0f%%")) {
+                SetBrightness(g_app_state.brightness);
             }
 
             ImGui::Spacing();
 
             // Contrast control
             ImGui::Text("Contrast:");
-            static float contrast_temp = g_app_state.contrast;
-            if (ImGui::SliderFloat("##contrast", &contrast_temp, 0.0f, 100.0f, "%.0f%%")) {
-                SetContrast(contrast_temp);
+            if (ImGui::SliderFloat("##contrast", &g_app_state.contrast, 0.0f, 100.0f, "%.0f%%")) {
+                SetContrast(g_app_state.contrast);
             }
 
             ImGui::Separator();
@@ -296,24 +315,24 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             // Quick presets
             ImGui::Text("Quick Presets:");
             if (ImGui::Button("Bright")) {
-                SetBrightness(100.0f);
-                SetContrast(75.0f);
-                brightness_temp = 100.0f;
-                contrast_temp = 75.0f;
+                g_app_state.brightness = 100.0f;
+                g_app_state.contrast = 75.0f;
+                SetBrightness(g_app_state.brightness);
+                SetContrast(g_app_state.contrast);
             }
             ImGui::SameLine();
             if (ImGui::Button("Normal")) {
-                SetBrightness(75.0f);
-                SetContrast(50.0f);
-                brightness_temp = 75.0f;
-                contrast_temp = 50.0f;
+                g_app_state.brightness = 75.0f;
+                g_app_state.contrast = 50.0f;
+                SetBrightness(g_app_state.brightness);
+                SetContrast(g_app_state.contrast);
             }
             ImGui::SameLine();
             if (ImGui::Button("Dark")) {
-                SetBrightness(20.0f);
-                SetContrast(40.0f);
-                brightness_temp = 20.0f;
-                contrast_temp = 40.0f;
+                g_app_state.brightness = 20.0f;
+                g_app_state.contrast = 40.0f;
+                SetBrightness(g_app_state.brightness);
+                SetContrast(g_app_state.contrast);
             }
 
             ImGui::Separator();

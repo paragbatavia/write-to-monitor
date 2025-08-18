@@ -93,3 +93,5 @@ BOOL WriteValueToMonitor(NvPhysicalGpuHandle hPhysicalGpu, NvU32 displayId, BYTE
 
     return TRUE;
 }
+
+
