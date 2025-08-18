@@ -1,6 +1,0 @@
-C:/Users/parag/source/write-to-monitor/build/CMakeFiles/writeValueToDisplay.dir
-C:/Users/parag/source/write-to-monitor/build/CMakeFiles/monitor_control_gui.dir
-C:/Users/parag/source/write-to-monitor/build/CMakeFiles/PACKAGE.dir
-C:/Users/parag/source/write-to-monitor/build/CMakeFiles/INSTALL.dir
-C:/Users/parag/source/write-to-monitor/build/CMakeFiles/ALL_BUILD.dir
-C:/Users/parag/source/write-to-monitor/build/CMakeFiles/ZERO_CHECK.dir
