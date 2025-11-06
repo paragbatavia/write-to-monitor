@@ -33,6 +33,9 @@ MinSizeRel/
 .vscode/
 .history/
 
+# Claude Code
+.claude/
+
 # Compiled executables
 *.exe
 *.dll

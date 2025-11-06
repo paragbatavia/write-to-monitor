@@ -17,6 +17,10 @@
 // Monitor control functions
 #include "monitor_control.h"
 
+// HTTP API Server
+#include "http_api_server.h"
+#include "thread_safe_control.h"
+
 // Data
 static ID3D11Device*            g_pd3dDevice = nullptr;
 static ID3D11DeviceContext*     g_pd3dDeviceContext = nullptr;
@@ -49,6 +53,8 @@ struct AppState {
 };
 
 static AppState g_app_state;
+static ThreadSafeMonitorControl* g_thread_safe_control = nullptr;
+static HttpApiServer* g_http_server = nullptr;
 
 // GUI-specific initialization wrapper
 bool InitializeGUI()
@@ -235,6 +241,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     // Initialize NVidia API
     g_app_state.nvapi_initialized = InitializeGUI();
 
+    // Initialize HTTP API Server
+    g_thread_safe_control = new ThreadSafeMonitorControl(&g_app_state);
+
+    ServerConfig server_config = ServerConfig::LoadConfig("config.env");
+    if (server_config.enabled) {
+        g_http_server = new HttpApiServer(g_thread_safe_control);
+        if (g_http_server->Start(server_config)) {
+            snprintf(g_app_state.status_message, sizeof(g_app_state.status_message),
+                    "HTTP API listening on %s:%d",
+                    server_config.host.c_str(), server_config.port);
+        } else {
+            snprintf(g_app_state.status_message, sizeof(g_app_state.status_message),
+                    "Failed to start HTTP API server");
+        }
+    }
+
     // Our state
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -375,6 +397,17 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
         g_pSwapChain->Present(1, 0); // Present with vsync
+    }
+
+    // Cleanup HTTP API Server
+    if (g_http_server) {
+        g_http_server->Stop();
+        delete g_http_server;
+        g_http_server = nullptr;
+    }
+    if (g_thread_safe_control) {
+        delete g_thread_safe_control;
+        g_thread_safe_control = nullptr;
     }
 
     // Cleanup

@@ -35,6 +35,7 @@ endif()
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
     ${CMAKE_SOURCE_DIR}/external/nvapi
+    ${CMAKE_SOURCE_DIR}/external/cpp-httplib
 )
 
 # ImGui source files
@@ -58,6 +59,9 @@ add_executable(writeValueToDisplay
 add_executable(monitor_control_gui WIN32
     src/monitor_control_gui.cpp
     src/monitor_control.cpp
+    src/config_parser.cpp
+    src/thread_safe_control.cpp
+    src/http_api_server.cpp
     ${IMGUI_SOURCES}
 )
 
@@ -71,6 +75,7 @@ target_link_libraries(monitor_control_gui
     ${NVAPI_LIB_PATH}
     d3d11
     dxgi
+    ws2_32
 )
 
 # Set additional include directories for ImGui

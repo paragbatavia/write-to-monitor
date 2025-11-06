@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Windows C++ application for controlling monitors via I2C using the NVidia API. It provides both a command-line interface and a GUI application using Dear ImGui with DirectX 11. The project sends VCP (VESA Control Protocol) commands or manufacturer-specific commands to monitors through NVidia's I2C interface.
+This is a Windows C++ application for controlling monitors via I2C using the NVidia API. It provides:
+1. A command-line interface for direct monitor control
+2. A GUI application using Dear ImGui with DirectX 11
+3. An HTTP API server (built into the GUI) for remote/programmatic control
+
+The project sends VCP (VESA Control Protocol) commands or manufacturer-specific commands to monitors through NVidia's I2C interface.
 
 ## Build Commands
 
@@ -180,3 +185,54 @@ The GUI application demonstrates:
 - Real-time monitor control without blocking UI
 - Error handling and status messages
 - Theme customization for Windows integration
+
+## HTTP API Server
+
+The GUI application includes a built-in HTTP REST API server for remote/programmatic control.
+
+### Architecture
+
+**Threading Model:**
+- Main thread: GUI rendering and Windows message loop
+- HTTP server thread: Runs cpp-httplib server in blocking mode
+- Thread synchronization: `ThreadSafeMonitorControl` class with mutex protection
+
+**Components:**
+- `src/http_api_server.cpp/h`: HTTP server implementation using cpp-httplib
+- `src/thread_safe_control.cpp/h`: Thread-safe wrapper for monitor control operations
+- `src/config_parser.cpp/h`: Simple .env file parser for configuration
+- `external/cpp-httplib/httplib.h`: Single-header HTTP library (no SSL support)
+
+### Configuration
+
+The server reads configuration from `config.env` in the executable directory:
+```ini
+HTTP_PORT=45678          # Default: 45678
+HTTP_HOST=127.0.0.1      # Default: localhost-only
+API_ENABLED=true         # Default: true
+```
+
+### API Endpoints
+
+**POST /api/brightness** - Set brightness (0-100)
+**POST /api/contrast** - Set contrast (0-100)
+**POST /api/input** - Set input source (1=HDMI 1, 2=HDMI 2, 3=DisplayPort, 4=USB-C)
+**GET /api/status** - Get current monitor status
+**GET /health** - Server health check
+
+All endpoints return JSON responses with `{"success": true/false, "message": "..."}` format.
+
+### Thread Safety
+
+The `ThreadSafeMonitorControl` class provides mutex-protected access to `AppState`:
+- All monitor control operations lock a mutex before accessing shared state
+- HTTP requests wait if GUI is simultaneously updating monitor settings
+- Status messages are updated atomically
+
+### Implementation Notes
+
+1. **No SSL/TLS**: cpp-httplib is used without `CPPHTTPLIB_OPENSSL_SUPPORT` to avoid OpenSSL dependency
+2. **Localhost-only by default**: Binds to 127.0.0.1 for security
+3. **Simple JSON parsing**: Custom parser for basic `{"key": value}` format (no external JSON library)
+4. **CMake integration**: Links against `ws2_32.lib` (Windows Sockets) required by cpp-httplib
+5. **Server lifecycle**: Started after NvAPI initialization, stopped before GUI cleanup

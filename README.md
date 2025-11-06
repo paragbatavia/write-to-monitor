@@ -35,8 +35,56 @@ This project now uses **CMake** for cross-platform builds and better dependency 
 
 📖 **Detailed build instructions:** [docs/BUILD.md](docs/BUILD.md)
 🖥️ **GUI development guide:** [docs/GUI_OPTIONS.md](docs/GUI_OPTIONS.md)
+🌐 **HTTP API documentation:** [docs/API.md](docs/API.md)
 
-### History 
+## HTTP API Server
+
+The GUI application (`monitor_control_gui.exe`) includes a built-in HTTP API server for remote/programmatic control.
+
+### Quick Start
+
+1. Run `monitor_control_gui.exe`
+2. The server automatically starts on `http://localhost:45678`
+3. Test it: `curl http://localhost:45678/health`
+
+### Configuration
+
+Edit `config.env` in the same directory as the executable:
+
+```ini
+HTTP_PORT=45678              # Server port (default: 45678)
+HTTP_HOST=127.0.0.1          # Bind address (127.0.0.1 = localhost only)
+API_ENABLED=true             # Enable/disable the API server
+```
+
+### Available Endpoints
+
+- `POST /api/brightness` - Set brightness (0-100)
+- `POST /api/contrast` - Set contrast (0-100)
+- `POST /api/input` - Set input source (1=HDMI 1, 2=HDMI 2, 3=DisplayPort, 4=USB-C)
+- `GET /api/status` - Get current monitor status
+- `GET /health` - Health check
+
+### Example Usage
+
+```bash
+# Set brightness to 75%
+curl -X POST http://localhost:45678/api/brightness \
+  -H "Content-Type: application/json" \
+  -d '{"value": 75}'
+
+# Switch to DisplayPort
+curl -X POST http://localhost:45678/api/input \
+  -H "Content-Type: application/json" \
+  -d '{"source": 3}'
+
+# Get current status
+curl http://localhost:45678/api/status
+```
+
+📚 **Full API Documentation:** [docs/API.md](docs/API.md) - Complete reference with all endpoints, error codes, and integration examples
+
+## History
 This program was created after discovering that my display does not work with <b>ControlMyMonitor</b> to change inputs using VCP commands. Searching for an antlernative lead me to this thread https://github.com/rockowitz/ddcutil/issues/100 where other users had found a way to switch the inputs of their LG monitors using a linux program, I needed a windows solution. That lead to the NVIDIA API, this program is an adaptation of the i2c example code provided in the API
 
 ## Usage
