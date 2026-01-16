@@ -387,6 +387,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ImGui::Separator();
         ImGui::Text("Status: %s", g_app_state.status_message);
 
+        // API server status indicator
+        ImGui::SameLine();
+        if (g_http_server && g_http_server->IsRunning()) {
+            ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "[API: Online]");
+        } else {
+            ImGui::TextColored(ImVec4(0.8f, 0.0f, 0.0f, 1.0f), "[API: Offline]");
+        }
+
         ImGui::End();
 
         // Rendering

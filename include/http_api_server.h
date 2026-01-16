@@ -5,8 +5,22 @@
 #include <atomic>
 #include <string>
 #include <memory>
+#include <fstream>
+#include <mutex>
+#include <condition_variable>
 
 class ThreadSafeMonitorControl;
+
+// Simple file logger for debugging HTTP server issues
+class ServerLogger {
+public:
+    static void Init(const std::string& log_path);
+    static void Log(const char* level, const char* format, ...);
+    static void Close();
+private:
+    static std::ofstream log_file;
+    static std::mutex log_mutex;
+};
 
 // Server configuration
 struct ServerConfig {
@@ -24,6 +38,10 @@ private:
     std::unique_ptr<std::thread> server_thread;
     std::atomic<bool> running;
     std::atomic<bool> should_stop;
+    std::atomic<bool> bind_attempted;
+    std::atomic<bool> bind_succeeded;
+    std::condition_variable bind_cv;
+    std::mutex bind_mutex;
     ServerConfig config;
     ThreadSafeMonitorControl* monitor_control;
 

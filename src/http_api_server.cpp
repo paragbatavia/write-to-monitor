@@ -7,6 +7,58 @@
 #include "config_parser.h"
 #include <sstream>
 #include <stdio.h>
+#include <cstdarg>
+
+// ServerLogger implementation
+std::ofstream ServerLogger::log_file;
+std::mutex ServerLogger::log_mutex;
+
+void ServerLogger::Init(const std::string& log_path) {
+    std::lock_guard<std::mutex> lock(log_mutex);
+    if (log_file.is_open()) {
+        log_file.close();
+    }
+    log_file.open(log_path, std::ios::out | std::ios::app);
+    if (log_file.is_open()) {
+        // Write startup marker
+        SYSTEMTIME st;
+        GetLocalTime(&st);
+        char timestamp[64];
+        snprintf(timestamp, sizeof(timestamp), "%04d-%02d-%02d %02d:%02d:%02d.%03d",
+                 st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+        log_file << "\n=== Log started at " << timestamp << " ===" << std::endl;
+    }
+}
+
+void ServerLogger::Log(const char* level, const char* format, ...) {
+    std::lock_guard<std::mutex> lock(log_mutex);
+    if (!log_file.is_open()) return;
+
+    // Get timestamp
+    SYSTEMTIME st;
+    GetLocalTime(&st);
+    char timestamp[64];
+    snprintf(timestamp, sizeof(timestamp), "%04d-%02d-%02d %02d:%02d:%02d.%03d",
+             st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+
+    // Format message
+    char message[512];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(message, sizeof(message), format, args);
+    va_end(args);
+
+    log_file << "[" << timestamp << "] [" << level << "] " << message << std::endl;
+    log_file.flush();
+}
+
+void ServerLogger::Close() {
+    std::lock_guard<std::mutex> lock(log_mutex);
+    if (log_file.is_open()) {
+        log_file << "=== Log closed ===" << std::endl;
+        log_file.close();
+    }
+}
 
 // Helper function to parse JSON-like simple format: {"key": value}
 static bool ParseJsonInt(const std::string& body, const std::string& key, int& value) {
@@ -80,7 +132,7 @@ std::string HttpApiServer::CreateJsonResponse(bool success, const std::string& m
 }
 
 HttpApiServer::HttpApiServer(ThreadSafeMonitorControl* control)
-    : running(false), should_stop(false), monitor_control(control) {
+    : running(false), should_stop(false), bind_attempted(false), bind_succeeded(false), monitor_control(control) {
 }
 
 HttpApiServer::~HttpApiServer() {
@@ -92,26 +144,32 @@ void HttpApiServer::ServerThreadFunc() {
 
     // POST /api/brightness - Set brightness (0-100)
     server.Post("/api/brightness", [this](const httplib::Request& req, httplib::Response& res) {
+        ServerLogger::Log("INFO", "POST /api/brightness - body: %s", req.body.c_str());
+
         float brightness;
         if (!ParseJsonFloat(req.body, "value", brightness)) {
+            ServerLogger::Log("WARN", "Invalid brightness request - missing value");
             res.status = 400;
             res.set_content(CreateJsonResponse(false, "Invalid request: missing or invalid 'value' field"), "application/json");
             return;
         }
 
         if (brightness < 0.0f || brightness > 100.0f) {
+            ServerLogger::Log("WARN", "Invalid brightness value: %.0f", brightness);
             res.status = 400;
             res.set_content(CreateJsonResponse(false, "Value must be between 0 and 100"), "application/json");
             return;
         }
 
         if (!monitor_control->IsInitialized()) {
+            ServerLogger::Log("ERROR", "NvAPI not initialized for brightness request");
             res.status = 503;
             res.set_content(CreateJsonResponse(false, "NvAPI not initialized"), "application/json");
             return;
         }
 
         bool success = monitor_control->SetBrightness(brightness);
+        ServerLogger::Log("INFO", "SetBrightness(%.0f) = %s", brightness, success ? "success" : "failed");
         if (success) {
             std::ostringstream fields;
             fields << "\"brightness\": " << static_cast<int>(brightness);
@@ -124,26 +182,32 @@ void HttpApiServer::ServerThreadFunc() {
 
     // POST /api/contrast - Set contrast (0-100)
     server.Post("/api/contrast", [this](const httplib::Request& req, httplib::Response& res) {
+        ServerLogger::Log("INFO", "POST /api/contrast - body: %s", req.body.c_str());
+
         float contrast;
         if (!ParseJsonFloat(req.body, "value", contrast)) {
+            ServerLogger::Log("WARN", "Invalid contrast request - missing value");
             res.status = 400;
             res.set_content(CreateJsonResponse(false, "Invalid request: missing or invalid 'value' field"), "application/json");
             return;
         }
 
         if (contrast < 0.0f || contrast > 100.0f) {
+            ServerLogger::Log("WARN", "Invalid contrast value: %.0f", contrast);
             res.status = 400;
             res.set_content(CreateJsonResponse(false, "Value must be between 0 and 100"), "application/json");
             return;
         }
 
         if (!monitor_control->IsInitialized()) {
+            ServerLogger::Log("ERROR", "NvAPI not initialized for contrast request");
             res.status = 503;
             res.set_content(CreateJsonResponse(false, "NvAPI not initialized"), "application/json");
             return;
         }
 
         bool success = monitor_control->SetContrast(contrast);
+        ServerLogger::Log("INFO", "SetContrast(%.0f) = %s", contrast, success ? "success" : "failed");
         if (success) {
             std::ostringstream fields;
             fields << "\"contrast\": " << static_cast<int>(contrast);
@@ -156,27 +220,34 @@ void HttpApiServer::ServerThreadFunc() {
 
     // POST /api/input - Set input source (1-4)
     server.Post("/api/input", [this](const httplib::Request& req, httplib::Response& res) {
+        ServerLogger::Log("INFO", "POST /api/input - body: %s", req.body.c_str());
+
         int source;
         if (!ParseJsonInt(req.body, "source", source)) {
+            ServerLogger::Log("WARN", "Invalid input request - missing source");
             res.status = 400;
             res.set_content(CreateJsonResponse(false, "Invalid request: missing or invalid 'source' field"), "application/json");
             return;
         }
 
         if (source < 1 || source > 4) {
+            ServerLogger::Log("WARN", "Invalid input source: %d", source);
             res.status = 400;
             res.set_content(CreateJsonResponse(false, "Source must be between 1 and 4 (1=HDMI 1, 2=HDMI 2, 3=DisplayPort, 4=USB-C)"), "application/json");
             return;
         }
 
         if (!monitor_control->IsInitialized()) {
+            ServerLogger::Log("ERROR", "NvAPI not initialized for input request");
             res.status = 503;
             res.set_content(CreateJsonResponse(false, "NvAPI not initialized"), "application/json");
             return;
         }
 
         const char* input_names[] = {"HDMI 1", "HDMI 2", "DisplayPort", "USB-C"};
+        ServerLogger::Log("INFO", "Switching input to %s (source=%d)", input_names[source - 1], source);
         bool success = monitor_control->SetInputSource(source);
+        ServerLogger::Log("INFO", "SetInputSource(%d) = %s", source, success ? "success" : "failed");
         if (success) {
             std::ostringstream fields;
             fields << "\"input\": " << source << ", \"input_name\": \"" << input_names[source - 1] << "\"";
@@ -189,6 +260,7 @@ void HttpApiServer::ServerThreadFunc() {
 
     // GET /api/status - Get current status
     server.Get("/api/status", [this](const httplib::Request& req, httplib::Response& res) {
+        ServerLogger::Log("INFO", "GET /api/status");
         std::ostringstream fields;
         fields << "\"brightness\": " << static_cast<int>(monitor_control->GetBrightness());
         fields << ", \"contrast\": " << static_cast<int>(monitor_control->GetContrast());
@@ -200,40 +272,88 @@ void HttpApiServer::ServerThreadFunc() {
     });
 
     // GET /health - Health check
-    server.Get("/health", [](const httplib::Request& req, httplib::Response& res) {
+    server.Get("/health", [this](const httplib::Request& req, httplib::Response& res) {
+        ServerLogger::Log("INFO", "GET /health");
         res.set_content("{\"status\": \"ok\", \"version\": \"1.0.0\"}", "application/json");
     });
 
-    // Start the server
-    running = true;
-    printf("HTTP API server starting on %s:%d\n", config.host.c_str(), config.port);
+    // Log that we're attempting to bind
+    ServerLogger::Log("INFO", "Attempting to bind to %s:%d", config.host.c_str(), config.port);
 
-    // Listen (blocking call)
-    if (!server.listen(config.host.c_str(), config.port)) {
-        printf("HTTP API server failed to bind to %s:%d\n", config.host.c_str(), config.port);
-        running = false;
+    // Try to bind first (this is a non-blocking check)
+    if (!server.bind_to_port(config.host.c_str(), config.port)) {
+        ServerLogger::Log("ERROR", "Failed to bind to %s:%d - port may be in use", config.host.c_str(), config.port);
+
+        // Signal bind failure
+        {
+            std::lock_guard<std::mutex> lock(bind_mutex);
+            bind_attempted = true;
+            bind_succeeded = false;
+            running = false;
+        }
+        bind_cv.notify_one();
         return;
     }
 
+    // Bind succeeded - signal and start listening
+    ServerLogger::Log("INFO", "Successfully bound to %s:%d, starting to listen", config.host.c_str(), config.port);
+    {
+        std::lock_guard<std::mutex> lock(bind_mutex);
+        bind_attempted = true;
+        bind_succeeded = true;
+        running = true;
+    }
+    bind_cv.notify_one();
+
+    // Now listen (this blocks until server.stop() is called)
+    if (!server.listen_after_bind()) {
+        ServerLogger::Log("WARN", "Server listen loop ended");
+    }
+
     running = false;
+    ServerLogger::Log("INFO", "Server thread exiting");
 }
 
 bool HttpApiServer::Start(const ServerConfig& cfg) {
     if (running) {
-        return false; // Already running
+        ServerLogger::Log("WARN", "Server already running");
+        return false;
     }
 
     config = cfg;
     should_stop = false;
+    bind_attempted = false;
+    bind_succeeded = false;
+
+    // Initialize logging
+    ServerLogger::Init("monitor_control.log");
+    ServerLogger::Log("INFO", "Starting HTTP API server on %s:%d", cfg.host.c_str(), cfg.port);
 
     try {
         server_thread = std::make_unique<std::thread>(&HttpApiServer::ServerThreadFunc, this);
 
-        // Give the server a moment to start
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        // Wait for bind to complete (with timeout)
+        std::unique_lock<std::mutex> lock(bind_mutex);
+        bool wait_result = bind_cv.wait_for(lock, std::chrono::seconds(5),
+            [this]() { return bind_attempted.load(); });
 
-        return running;
+        if (!wait_result) {
+            ServerLogger::Log("ERROR", "Timeout waiting for server to start");
+            return false;
+        }
+
+        if (!bind_succeeded) {
+            ServerLogger::Log("ERROR", "Server failed to bind - check if port %d is in use", cfg.port);
+            return false;
+        }
+
+        ServerLogger::Log("INFO", "Server started successfully");
+        return true;
+    } catch (const std::exception& e) {
+        ServerLogger::Log("ERROR", "Exception starting server: %s", e.what());
+        return false;
     } catch (...) {
+        ServerLogger::Log("ERROR", "Unknown exception starting server");
         return false;
     }
 }
