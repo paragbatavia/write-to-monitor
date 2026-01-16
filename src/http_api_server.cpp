@@ -1,4 +1,6 @@
 #define WIN32_LEAN_AND_MEAN
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 
 #include "httplib.h"
@@ -280,9 +282,32 @@ void HttpApiServer::ServerThreadFunc() {
     // Log that we're attempting to bind
     ServerLogger::Log("INFO", "Attempting to bind to %s:%d", config.host.c_str(), config.port);
 
+    // Ensure WSA is initialized (may be redundant but helps diagnose)
+    WSADATA wsaData;
+    int wsa_init_result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    if (wsa_init_result != 0) {
+        ServerLogger::Log("ERROR", "WSAStartup failed with error: %d", wsa_init_result);
+    } else {
+        ServerLogger::Log("INFO", "WSAStartup succeeded (or was already initialized)");
+    }
+
+    // Test getaddrinfo directly
+    struct addrinfo hints = {}, *result = nullptr;
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
+    int gai_result = getaddrinfo(config.host.c_str(), std::to_string(config.port).c_str(), &hints, &result);
+    if (gai_result != 0) {
+        ServerLogger::Log("ERROR", "getaddrinfo failed: %d (%s)", gai_result, gai_strerrorA(gai_result));
+    } else {
+        ServerLogger::Log("INFO", "getaddrinfo succeeded for %s:%d", config.host.c_str(), config.port);
+        freeaddrinfo(result);
+    }
+
     // Try to bind first (this is a non-blocking check)
     if (!server.bind_to_port(config.host.c_str(), config.port)) {
-        ServerLogger::Log("ERROR", "Failed to bind to %s:%d - port may be in use", config.host.c_str(), config.port);
+        int wsa_error = WSAGetLastError();
+        ServerLogger::Log("ERROR", "Failed to bind to %s:%d - WSA error code: %d", config.host.c_str(), config.port, wsa_error);
 
         // Signal bind failure
         {
@@ -325,8 +350,16 @@ bool HttpApiServer::Start(const ServerConfig& cfg) {
     bind_attempted = false;
     bind_succeeded = false;
 
-    // Initialize logging
-    ServerLogger::Init("monitor_control.log");
+    // Initialize logging - use absolute path next to executable
+    char exe_path[MAX_PATH];
+    GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+    std::string log_path(exe_path);
+    size_t last_slash = log_path.find_last_of("\\/");
+    if (last_slash != std::string::npos) {
+        log_path = log_path.substr(0, last_slash + 1);
+    }
+    log_path += "monitor_control.log";
+    ServerLogger::Init(log_path);
     ServerLogger::Log("INFO", "Starting HTTP API server on %s:%d", cfg.host.c_str(), cfg.port);
 
     try {

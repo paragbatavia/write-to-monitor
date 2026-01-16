@@ -3,24 +3,36 @@
 ## Problem Summary
 StreamDeck commands to switch monitor inputs intermittently fail. Root cause: **silent server startup failures** - the HTTP server may fail to bind to the port, but the GUI reports success anyway due to a race condition.
 
-## Critical Issues Identified
+## Current Status (2026-01-15)
 
-1. **Race condition in startup**: `running = true` was set BEFORE `server.listen()` completes
-2. **Invisible errors**: `printf()` output goes nowhere (WIN32 GUI has no console)
-3. **No health visibility**: No way to verify server is accepting connections
+**Issue**: Server bind is failing with WSA error code 0 (no socket error), indicating the problem is inside cpp-httplib before any actual socket operation occurs.
+
+**Diagnostic logging added** to pinpoint the exact failure location:
+1. WSAStartup verification
+2. getaddrinfo test before bind
+3. Detailed error codes at each step
+
+**Next step**: Reboot Windows and test again - may be a stale socket state or system issue.
 
 ---
 
-## Changes Already Implemented
+## Critical Issues Identified
 
-All code changes have been made. You just need to build and test.
+1. **Race condition in startup**: `running = true` was set BEFORE `server.listen()` completes - **FIXED**
+2. **Invisible errors**: `printf()` output goes nowhere (WIN32 GUI has no console) - **FIXED with file logging**
+3. **No health visibility**: No way to verify server is accepting connections - **FIXED with [API: Online/Offline] indicator**
+4. **Log file path**: Was relative, now uses absolute path next to executable - **FIXED**
+
+---
+
+## Changes Implemented
 
 ### Files Modified
 
 | File | Changes |
 |------|---------|
 | `include/http_api_server.h` | Added `ServerLogger` class, added sync primitives (`bind_attempted`, `bind_succeeded`, `bind_cv`, `bind_mutex`) |
-| `src/http_api_server.cpp` | Added logger implementation, fixed `Start()` race condition using `bind_to_port()` + `listen_after_bind()`, added request logging to all endpoints |
+| `src/http_api_server.cpp` | Added logger implementation, fixed `Start()` race condition using `bind_to_port()` + `listen_after_bind()`, added request logging to all endpoints, added diagnostic WSAStartup/getaddrinfo logging |
 | `src/monitor_control_gui.cpp` | Added colored API status indicator `[API: Online]` / `[API: Offline]` |
 
 ---
@@ -64,17 +76,16 @@ The log file `monitor_control.log` will contain entries like:
 ```
 === Log started at 2024-01-15 10:30:45.123 ===
 [2024-01-15 10:30:45.124] [INFO] Starting HTTP API server on 127.0.0.1:45678
-[2024-01-15 10:30:45.125] [INFO] Attempting to bind to 127.0.0.1:45678
-[2024-01-15 10:30:45.126] [INFO] Successfully bound to 127.0.0.1:45678, starting to listen
-[2024-01-15 10:30:45.127] [INFO] Server started successfully
-[2024-01-15 10:31:00.500] [INFO] POST /api/input - body: {"source": 3}
-[2024-01-15 10:31:00.501] [INFO] Switching input to DisplayPort (source=3)
-[2024-01-15 10:31:00.650] [INFO] SetInputSource(3) = success
+[2024-01-15 10:30:45.125] [INFO] WSAStartup succeeded (or was already initialized)
+[2024-01-15 10:30:45.126] [INFO] getaddrinfo succeeded for 127.0.0.1:45678
+[2024-01-15 10:30:45.127] [INFO] Attempting to bind to 127.0.0.1:45678
+[2024-01-15 10:30:45.128] [INFO] Successfully bound to 127.0.0.1:45678, starting to listen
+[2024-01-15 10:30:45.129] [INFO] Server started successfully
 ```
 
 If binding fails:
 ```
-[2024-01-15 10:30:45.126] [ERROR] Failed to bind to 127.0.0.1:45678 - port may be in use
+[2024-01-15 10:30:45.126] [ERROR] Failed to bind to 127.0.0.1:45678 - WSA error code: X
 [2024-01-15 10:30:45.127] [ERROR] Server failed to bind - check if port 45678 is in use
 ```
 
@@ -110,3 +121,9 @@ Check Task Manager for multiple `monitor_control_gui.exe` processes.
 - All API requests logged with timestamps
 - Server startup/shutdown logged
 - Bind success/failure logged with clear error messages
+- Log file created next to executable using absolute path
+
+### Diagnostic Logging (Current)
+- WSAStartup verification before bind attempt
+- getaddrinfo test to verify DNS/address resolution works
+- Detailed WSA error codes on failure

@@ -2,7 +2,7 @@
 
 ## Session Summary
 
-This document captures the context from a debugging session for the Monitor Control GUI application's HTTP API server reliability issues.
+This document captures the context from debugging sessions for the Monitor Control GUI application's HTTP API server reliability issues.
 
 ## Problem Statement
 
@@ -25,6 +25,24 @@ Three critical issues were identified:
 3. **No Runtime Health Visibility**
    - No way to see if server was actually accepting connections
    - GUI showed "HTTP API listening on..." even when server failed
+
+## Current Debug Status (2026-01-15)
+
+**Problem**: After implementing fixes, bind is still failing with WSA error code 0 (no socket-level error).
+
+**Analysis**: WSA error 0 means the failure is happening inside cpp-httplib BEFORE any actual socket operation. Possible causes:
+- Static initialization order issue with `WSInit` class
+- `getaddrinfo` failing before socket creation
+- `is_decommissioned` flag set from previous failed attempt
+
+**Diagnostic code added**:
+- Explicit `WSAStartup()` call before bind attempt
+- Direct `getaddrinfo()` test to verify address resolution
+- Detailed logging at each step
+
+**Next step**: Reboot Windows to clear any stale socket/system state and test again.
+
+---
 
 ## Changes Made
 
@@ -53,9 +71,21 @@ std::mutex bind_mutex;
 
 ### File: `src/http_api_server.cpp`
 
-1. **Logger implementation** (lines 12-61) - Thread-safe file logging with timestamps
+1. **Logger implementation** - Thread-safe file logging with timestamps
 
-2. **Fixed `ServerThreadFunc()`** - Now uses two-step binding:
+2. **Fixed log file path** - Now uses absolute path next to executable:
+   ```cpp
+   char exe_path[MAX_PATH];
+   GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+   std::string log_path(exe_path);
+   size_t last_slash = log_path.find_last_of("\\/");
+   if (last_slash != std::string::npos) {
+       log_path = log_path.substr(0, last_slash + 1);
+   }
+   log_path += "monitor_control.log";
+   ```
+
+3. **Fixed `ServerThreadFunc()`** - Now uses two-step binding:
    ```cpp
    // Try to bind first (non-blocking check)
    if (!server.bind_to_port(config.host.c_str(), config.port)) {
@@ -65,17 +95,30 @@ std::mutex bind_mutex;
    server.listen_after_bind();
    ```
 
-3. **Fixed `Start()` method** - Now waits for actual bind result:
+4. **Fixed `Start()` method** - Now waits for actual bind result:
    ```cpp
    bind_cv.wait_for(lock, std::chrono::seconds(5),
        [this]() { return bind_attempted.load(); });
    ```
 
-4. **Added request logging** to all endpoints (`/api/brightness`, `/api/contrast`, `/api/input`, `/api/status`, `/health`)
+5. **Added diagnostic logging** before bind:
+   ```cpp
+   // WSAStartup verification
+   WSADATA wsaData;
+   int wsa_init_result = WSAStartup(MAKEWORD(2, 2), &wsaData);
+
+   // getaddrinfo test
+   struct addrinfo hints = {}, *result = nullptr;
+   hints.ai_family = AF_INET;
+   hints.ai_socktype = SOCK_STREAM;
+   int gai_result = getaddrinfo(config.host.c_str(), port_str, &hints, &result);
+   ```
+
+6. **Added request logging** to all endpoints (`/api/brightness`, `/api/contrast`, `/api/input`, `/api/status`, `/health`)
 
 ### File: `src/monitor_control_gui.cpp`
 
-Added API status indicator (line 390-396):
+Added API status indicator:
 ```cpp
 if (g_http_server && g_http_server->IsRunning()) {
     ImGui::TextColored(ImVec4(0.0f, 0.8f, 0.0f, 1.0f), "[API: Online]");
@@ -87,7 +130,7 @@ if (g_http_server && g_http_server->IsRunning()) {
 ## Files Modified (Full List)
 
 - `include/http_api_server.h` - Added logger class and sync primitives
-- `src/http_api_server.cpp` - Major changes for logging and race condition fix
+- `src/http_api_server.cpp` - Major changes for logging, race condition fix, and diagnostics
 - `src/monitor_control_gui.cpp` - Added visual status indicator
 
 ## Build Commands
@@ -126,26 +169,50 @@ netstat -ano | findstr :45678
 After running the app, check `monitor_control.log` next to the executable:
 
 ```
-=== Log started at 2024-01-15 10:30:45.123 ===
-[2024-01-15 10:30:45.124] [INFO] Starting HTTP API server on 127.0.0.1:45678
-[2024-01-15 10:30:45.125] [INFO] Attempting to bind to 127.0.0.1:45678
-[2024-01-15 10:30:45.126] [INFO] Successfully bound to 127.0.0.1:45678, starting to listen
-[2024-01-15 10:30:45.127] [INFO] Server started successfully
+=== Log started at 2026-01-15 23:00:00.000 ===
+[2026-01-15 23:00:00.001] [INFO] Starting HTTP API server on 127.0.0.1:45678
+[2026-01-15 23:00:00.002] [INFO] WSAStartup succeeded (or was already initialized)
+[2026-01-15 23:00:00.003] [INFO] getaddrinfo succeeded for 127.0.0.1:45678
+[2026-01-15 23:00:00.004] [INFO] Attempting to bind to 127.0.0.1:45678
+[2026-01-15 23:00:00.005] [INFO] Successfully bound to 127.0.0.1:45678, starting to listen
+[2026-01-15 23:00:00.006] [INFO] Server started successfully
 ```
 
 ## What to Look For
 
 1. **GUI shows `[API: Online]`** (green) = Server is running correctly
 2. **GUI shows `[API: Offline]`** (red) = Server failed to start, check log
-3. **Log shows bind failure** = Another instance or process using port 45678
+3. **Log shows bind failure** = Check WSA error code and diagnostic messages
 4. **Log shows requests but no response** = I2C/monitor communication issue
 5. **No log file created** = Build issue or permissions problem
 
+## Observed Behavior (Pre-reboot)
+
+Log file showed:
+```
+=== Log started at 2026-01-15 23:02:33.250 ===
+[2026-01-15 23:02:33.251] [INFO] Starting HTTP API server on 127.0.0.1:45678
+[2026-01-15 23:02:33.251] [INFO] Attempting to bind to 127.0.0.1:45678
+[2026-01-15 23:02:33.252] [ERROR] Failed to bind to 127.0.0.1:45678 - WSA error code: 0
+[2026-01-15 23:02:33.252] [ERROR] Server failed to bind - check if port 45678 is in use
+```
+
+Port was NOT in use (`netstat` showed nothing on 45678), no zombie processes found.
+
 ## Next Steps for Debugging
 
-If issues persist after these changes:
-1. Check `monitor_control.log` for error messages
-2. Verify only one instance is running
-3. Check if firewall is blocking port 45678
-4. Test with `curl` to verify API is responding
-5. Check StreamDeck configuration (correct URL, port, JSON format)
+1. Reboot Windows to clear any stale state
+2. Run GUI and check new diagnostic log messages (WSAStartup, getaddrinfo results)
+3. If still failing, investigate cpp-httplib internals further
+4. Consider alternative: use simple Winsock server instead of cpp-httplib
+
+## cpp-httplib Internals (Reference)
+
+The bind flow in cpp-httplib:
+1. `bind_to_port()` calls `bind_internal()`
+2. `bind_internal()` checks `is_decommissioned` and `is_valid()` first
+3. If those pass, calls `create_server_socket()`
+4. `create_server_socket()` calls `detail::create_socket()`
+5. `detail::create_socket()` calls `getaddrinfo_with_timeout()` then creates socket
+
+`WSInit` static class should call `WSAStartup()` automatically at load time, but there may be static initialization order issues.
